@@ -6,6 +6,8 @@ import { appwriteConfig } from "../appwrite/config";
 import { parseStringify } from "../utils";
 import { cookies } from "next/headers";
 import { avatarPlaceHolderURL } from "@/constants";
+import { redirect } from "next/navigation";
+import { error } from "console";
 
 const getUserByEmail = async (email: string) => {
   const { databases } = await createAdminClient();
@@ -55,8 +57,7 @@ export const createAccount = async ({
       {
         fullName,
         email,
-        avatar:
-          avatarPlaceHolderURL,
+        avatar: avatarPlaceHolderURL,
         accountId,
       }
     );
@@ -70,24 +71,23 @@ export const verifySecret = async ({
 }: {
   accountId: string;
   password: string;
-    }) => {
-    
-    try {
-        const { account } = await createAdminClient();
-        const session = await account.createSession(accountId, password);
-        (await cookies()).set("appwrite-session", session.secret, {
-            path: "/",
-            httpOnly: true,
-            sameSite: "strict",
-            secure: true,
-        });
-        return parseStringify({sessionId: session.$id});
-    } catch (error) {
-        handleError(error, "Failed to verify OTP");
-    }
+}) => {
+  try {
+    const { account } = await createAdminClient();
+    const session = await account.createSession(accountId, password);
+    (await cookies()).set("appwrite-session", session.secret, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "strict",
+      secure: true,
+    });
+    return parseStringify({ sessionId: session.$id });
+  } catch (error) {
+    handleError(error, "Failed to verify OTP");
+  }
 };
 
-export const getCurrentUser = async () => { 
+export const getCurrentUser = async () => {
   const { databases, account } = await createSessionClient();
   const result = await account.get();
 
@@ -95,9 +95,44 @@ export const getCurrentUser = async () => {
     appwriteConfig.databaseId,
     appwriteConfig.userCollectionId,
     [Query.equal("accountId", result.$id)]
-  )
+  );
 
   if (user.total === 0) return null;
-  
+
   return parseStringify(user.documents[0]);
-}
+};
+
+export const signOutUser = async () => {
+  const { account } = await createSessionClient();
+  try {
+    // Delete the current session
+    await account.deleteSession("current");
+    (await cookies()).delete("appwrite-session");
+      
+  } catch (error) {
+
+    handleError(error, "Failed to sign out user");
+
+  } finally {
+
+    redirect("/sign-in");
+    
+  }
+};
+
+export const signInUser = async ({ email }: { email: string; }) => {
+  try {
+    const existingUser = await getUserByEmail(email);
+
+    // User exists, send OTP
+    if (existingUser) {
+      await sendEmailOTP({ email });
+      return parseStringify({ accountId: existingUser.accountId });
+    }
+    
+    return parseStringify({ accountId: null, error: "User not found" });
+
+  } catch (error) {
+    handleError(error, "Failed to sign in user");
+  }
+};
