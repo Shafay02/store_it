@@ -21,17 +21,17 @@ const Thumbnail = ({
 
   return (
     <figure className={cn("thumbnail", className)}>
-      <Image
+       <Image
         src={isImage ? url : getFileIcon(extension, type)}
         alt="thumbnail"
         width={100}
         height={100}
         className={cn(
-          "size-8 object-contain",
+          "size-8 object-contain ",
           imageClassName,
-          isImage && "thumbnail-image"
+          isImage && "thumbnail-image",
         )}
-          />
+      />
           
     </figure>
   );
